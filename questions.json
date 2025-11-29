@@ -1,0 +1,25 @@
+{
+  "mtp": [
+    {
+      "question": "Explain the accounting treatment on admission of a partner with goodwill.",
+      "topic": "Partnership"
+    },
+    {
+      "question": "Prepare bank reconciliation statement from given cash book and passbook balances.",
+      "topic": "Final Accounts"
+    }
+  ],
+  "rtp": [
+    {
+      "question": "From the following balances, prepare Trading and Profit & Loss Account with depreciation adjustments.",
+      "topic": "Final Accounts"
+    }
+  ],
+  "pyq": [
+    {
+      "question": "What is Concurrent Deviation? Show formula and a small example.",
+      "topic": "Statistics",
+      "year": 2023
+    }
+  ]
+}
