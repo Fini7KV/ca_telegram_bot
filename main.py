@@ -43,7 +43,9 @@ async def ask_gemini(question: str) -> str:
     try:
         async with httpx.AsyncClient() as client:
             response = await client.post(url, json=payload, headers=headers, timeout=20)
+
             print("Gemini Raw Response:", response.text)
+
             data = response.json()
 
             return data["candidates"][0]["content"]["parts"][0]["text"]
@@ -51,6 +53,7 @@ async def ask_gemini(question: str) -> str:
     except Exception as e:
         print("Gemini Error:", e)
         return "Sorry — unable to fetch an answer right now."
+
 
 # ---------------------------------------------------
 #  HOME PAGE
