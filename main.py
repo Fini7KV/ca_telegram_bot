@@ -34,25 +34,15 @@ async def ask_gemini(question: str) -> str:
     try:
         response = httpx.post(url, json=payload, headers=headers, timeout=20)
 
+        print("Gemini raw response:", response.text)
+
         data = response.json()
 
-        # Extract the text reply
         return data["candidates"][0]["content"]["parts"][0]["text"]
 
     except Exception as e:
         print("Gemini Error:", e)
         return "Sorry — unable to fetch an answer right now."
-
-
-# ------------------------------
-#  Telegram send message
-# ------------------------------
-async def send_message(chat_id, text):
-    async with httpx.AsyncClient() as client:
-        await client.post(f"{TELEGRAM_API}/sendMessage", json={
-            "chat_id": chat_id,
-            "text": text
-        })
 
 
 # ------------------------------
