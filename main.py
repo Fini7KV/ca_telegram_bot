@@ -2,95 +2,125 @@ import os
 import httpx
 from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse
-from dotenv import load_dotenv
 
-load_dotenv()
-
-# Telegram Bot Token
-BOT_TOKEN = os.environ.get("BOT_TOKEN")
-TG_API_URL = f"https://api.telegram.org/bot{BOT_TOKEN}"
-
-# Gemini API Key
-GEMINI_KEY = os.environ.get("GEMINI_KEY")
+# Load env
+BOT_TOKEN = os.getenv("BOT_TOKEN")
+GEMINI_KEY = os.getenv("GEMINI_KEY")
+PUBLIC_URL = os.getenv("PUBLIC_URL")
 
 app = FastAPI()
 
-# ---------------------------------
-# GEMINI REQUEST
-# ---------------------------------
+TELEGRAM_API = f"https://api.telegram.org/bot{BOT_TOKEN}"
+
+
+# ------------------------------
+#   Gemini – professional helper
+# ------------------------------
 async def ask_gemini(prompt: str) -> str:
     if not GEMINI_KEY:
-        return "Baby your GEMINI_KEY is missing in Render 😘"
+        return "API key error: Gemini key is missing on server."
 
     url = (
         "https://generativelanguage.googleapis.com/v1beta/"
-        "models/gemini-1.5-flash:generateContent"
-        f"?key={GEMINI_KEY}"
+        f"models/gemini-1.5-flash:generateContent?key={GEMINI_KEY}"
     )
 
     payload = {
         "contents": [
-            {"parts": [{"text": prompt}]}
+            {
+                "parts": [
+                    {"text": prompt}
+                ]
+            }
         ]
     }
 
-    async with httpx.AsyncClient(timeout=30) as client:
-        try:
-            r = await client.post(url, json=payload)
-            data = r.json()
+    try:
+        async with httpx.AsyncClient(timeout=40) as client:
+            response = await client.post(url, json=payload)
+            data = response.json()
 
-            return (
+            # Debug output to logs
+            print("Gemini raw response:", data)
+
+            # Extract Gemini output safely
+            answer = (
                 data.get("candidates", [{}])[0]
                     .get("content", {})
                     .get("parts", [{}])[0]
-                    .get("text", "No reply from Gemini baby 💋")
+                    .get("text")
             )
 
-        except Exception as e:
-            return f"Gemini error: {str(e)}"
+            if not answer:
+                return "I’m sorry — unable to fetch an answer at the moment. Please try again."
+
+            return answer.strip()
+
+    except Exception as e:
+        print("Gemini Error:", e)
+        return "An error occurred while contacting Gemini."
 
 
-# ---------------------------------
-# SEND MESSAGE TO TELEGRAM
-# ---------------------------------
-async def send_message(chat_id: int, text: str):
-    url = f"{TG_API_URL}/sendMessage"
-    payload = {"chat_id": chat_id, "text": text}
-
+# ------------------------------
+#  Telegram send message
+# ------------------------------
+async def send_message(chat_id, text):
     async with httpx.AsyncClient() as client:
-        await client.post(url, json=payload)
+        await client.post(f"{TELEGRAM_API}/sendMessage", json={
+            "chat_id": chat_id,
+            "text": text
+        })
 
 
-# ---------------------------------
-# TELEGRAM WEBHOOK
-# ---------------------------------
-@app.post("/webhook")
-async def webhook(request: Request):
-    data = await request.json()
-
-    if "message" not in data:
-        return JSONResponse({"ok": True})
-
-    chat_id = data["message"]["chat"]["id"]
-    user_text = data["message"].get("text", "")
-
-    text = user_text.lower().strip()
-
-    # Custom greeting replies
-    greetings = ["hi", "hello", "hey", "hii", "hiii", "hai", "vanakkam", "/start"]
-    
-    if text in greetings:
-        reply = "Hi there, Future CA of Munnetram 🙌✨\nHow can I help you today?"
-        await send_message(chat_id, reply)
-        return JSONResponse({"ok": True})
-
-    # Ask Gemini for everything else
-    reply = await ask_gemini(user_text)
-    await send_message(chat_id, reply)
-
-    return JSONResponse({"ok": True})
-# HOME ROUTE
-# ---------------------------------
+# ------------------------------
+#     Webhook setup
+# ------------------------------
 @app.get("/")
-async def home():
-    return {"status": "Bot is running with Gemini 💙"}
+def home():
+    return {"status": "Bot is running professionally with Gemini 💙"}
+
+
+@app.post("/webhook")
+async def telegram_webhook(request: Request):
+    update = await request.json()
+    print("Telegram update:", update)
+
+    if "message" not in update:
+        return JSONResponse({"ok": True})
+
+    message = update["message"]
+    chat_id = message["chat"]["id"]
+    text = message.get("text", "").strip()
+
+    # Greeting
+    if text.lower() in ["/start", "hi", "hello", "hey"]:
+        await send_message(
+            chat_id,
+            "Hello, Future CA!\n\n"
+            "I’m your Study Assistant. How can I help you today?\n"
+            "You can ask questions from:\n"
+            "- Business Law\n"
+            "- Mathematics, Statistics\n"
+            "- Economics\n"
+            "- Accounting (Basic theory)"
+        )
+        return {"ok": True}
+
+    # Ask Gemini for any question
+    reply = await ask_gemini(text)
+    await send_message(chat_id, reply)
+    return {"ok": True}
+
+
+# ------------------------------
+#     Set webhook (manual)
+# ------------------------------
+@app.get("/setwebhook")
+async def set_webhook():
+    if not PUBLIC_URL:
+        return {"error": "PUBLIC_URL is missing"}
+
+    url = f"{TELEGRAM_API}/setWebhook?url={PUBLIC_URL}/webhook"
+    async with httpx.AsyncClient() as client:
+        r = await client.get(url)
+        return r.json()
