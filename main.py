@@ -25,33 +25,36 @@ async def send_message(chat_id: int, text: str):
 # ---------------------------------------------------
 # OpenRouter AI Answer Function
 # ---------------------------------------------------
-async def ask_ai(question: str) -> str:
+async def ask_openrouter(question: str) -> str:
     url = "https://openrouter.ai/api/v1/chat/completions"
 
     headers = {
-        "Content-Type": "application/json",
         "Authorization": f"Bearer {OPENROUTER_KEY}",
-        "HTTP-Referer": "https://yourdomain.com",
-        "X-Title": "CA Study Telegram Bot"
+        "Content-Type": "application/json"
     }
 
     payload = {
-        "model": "deepseek/deepseek-chat",    # Baby, you can change model here
+        "model": "deepseek/deepseek-chat",
         "messages": [
-            {"role": "system", "content": "You are a CA Foundation study assistant. Answer clean, accurate, and simple."},
             {"role": "user", "content": question}
         ]
     }
 
     try:
-        async with httpx.AsyncClient() as client:
-            res = await client.post(url, headers=headers, json=payload)
+        async with httpx.AsyncClient(timeout=20) as client:
+            res = await client.post(url, json=payload, headers=headers)
+
+            print("OpenRouter Raw:", res.text)
+
             data = res.json()
+
+            # OPENROUTER PARSING
             return data["choices"][0]["message"]["content"]
 
     except Exception as e:
         print("OpenRouter Error:", e)
-        return "Sorry baby — I couldn't fetch an answer now."
+        return "Sorry Aspirant, I couldn't fetch an answer right now 😞"
+
 
 
 # ---------------------------------------------------
