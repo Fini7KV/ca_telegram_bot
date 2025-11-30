@@ -16,49 +16,32 @@ TELEGRAM_API = f"https://api.telegram.org/bot{BOT_TOKEN}"
 # ------------------------------
 #   Gemini – professional helper
 # ------------------------------
-async def ask_gemini(prompt: str) -> str:
-    if not GEMINI_KEY:
-        return "API key error: Gemini key is missing on server."
-
-    url = (
-        "https://generativelanguage.googleapis.com/v1beta/"
-        f"models/gemini-1.5-flash:generateContent?key={GEMINI_KEY}"
-    )
+async def ask_gemini(question: str) -> str:
+    url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:generateContent?key={GEMINI_KEY}"
 
     payload = {
         "contents": [
             {
                 "parts": [
-                    {"text": prompt}
+                    {"text": question}
                 ]
             }
         ]
     }
 
+    headers = {"Content-Type": "application/json"}
+
     try:
-        async with httpx.AsyncClient(timeout=40) as client:
-            response = await client.post(url, json=payload)
-            data = response.json()
+        response = httpx.post(url, json=payload, headers=headers, timeout=20)
 
-            # Debug output to logs
-            print("Gemini raw response:", data)
+        data = response.json()
 
-            # Extract Gemini output safely
-            answer = (
-                data.get("candidates", [{}])[0]
-                    .get("content", {})
-                    .get("parts", [{}])[0]
-                    .get("text")
-            )
-
-            if not answer:
-                return "I’m sorry — unable to fetch an answer at the moment. Please try again."
-
-            return answer.strip()
+        # Extract the text reply
+        return data["candidates"][0]["content"]["parts"][0]["text"]
 
     except Exception as e:
         print("Gemini Error:", e)
-        return "An error occurred while contacting Gemini."
+        return "Sorry — unable to fetch an answer right now."
 
 
 # ------------------------------
