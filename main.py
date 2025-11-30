@@ -16,8 +16,18 @@ TELEGRAM_API = f"https://api.telegram.org/bot{BOT_TOKEN}"
 # ------------------------------
 #   SEND MESSAGE TO TELEGRAM
 # ------------------------------
-async def ask_gemini(question: str) -> str:
-    url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key={GEMINI_KEY}"
+import httpx
+import json # You might need this if you manually process JSON, but httpx handles it well.
+
+async def ask_gemini(question: str, gemini_key: str) -> str:
+    # 1. Use the secure Authorization Header (Recommended)
+    url = "https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent"
+    
+    headers = {
+        "Content-Type": "application/json",
+        # Pass the key in the header for security and best practice
+        "Authorization": f"Bearer {gemini_key}" 
+    }
 
     payload = {
         "contents": [
@@ -31,15 +41,31 @@ async def ask_gemini(question: str) -> str:
 
     try:
         async with httpx.AsyncClient(timeout=20) as client:
-            response = await client.post(url, json=payload)
-            print("Gemini raw response:", response.text)
-
+            response = await client.post(
+                url, 
+                headers=headers, 
+                json=payload
+            )
+            
+            # Check for HTTP errors (4xx or 5xx)
+            response.raise_for_status() 
+            
             data = response.json()
+
+            # Handle potential API errors where response is successful but content is missing
+            if 'candidates' not in data or not data['candidates']:
+                return "Sorry, the API returned no candidates."
 
             return data["candidates"][0]["content"]["parts"][0]["text"]
 
+    except httpx.HTTPStatusError as e:
+        # Handle specific 4xx/5xx errors (e.g., key invalid, rate limit)
+        print(f"Gemini API HTTP Error: {e.response.status_code} - {e.response.text}")
+        return "Sorry — the Gemini API returned an error (e.g., invalid key or rate limit)."
+
     except Exception as e:
-        print("Gemini Error:", e)
+        # Handle network issues, JSON decoding errors, etc.
+        print("Gemini Network/Other Error:", e)
         return "Sorry — I couldn’t fetch an answer right now."
 # ------------------------------
 #     Home Route
