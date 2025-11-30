@@ -1,7 +1,5 @@
 import os
-import json
 import httpx
-import asyncio
 from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse
 from dotenv import load_dotenv
@@ -12,18 +10,17 @@ load_dotenv()
 BOT_TOKEN = os.environ.get("BOT_TOKEN")
 TG_API_URL = f"https://api.telegram.org/bot{BOT_TOKEN}"
 
-# Gemini Key
+# Gemini API Key
 GEMINI_KEY = os.environ.get("GEMINI_KEY")
 
 app = FastAPI()
 
-
-# -------------------------------
-#  GEMINI API CALL
-# -------------------------------
+# ---------------------------------
+# GEMINI REQUEST
+# ---------------------------------
 async def ask_gemini(prompt: str) -> str:
     if not GEMINI_KEY:
-        return "Baby, your Gemini key is missing. Add GEMINI_KEY in Render 😘"
+        return "Baby your GEMINI_KEY is missing in Render 😘"
 
     url = (
         "https://generativelanguage.googleapis.com/v1beta/"
@@ -33,31 +30,29 @@ async def ask_gemini(prompt: str) -> str:
 
     payload = {
         "contents": [
-            {
-                "parts": [{"text": prompt}]
-            }
+            {"parts": [{"text": prompt}]}
         ]
     }
 
-    async with httpx.AsyncClient(timeout=30.0) as client:
+    async with httpx.AsyncClient(timeout=30) as client:
         try:
-            response = await client.post(url, json=payload)
-            data = response.json()
+            r = await client.post(url, json=payload)
+            data = r.json()
 
             return (
                 data.get("candidates", [{}])[0]
                     .get("content", {})
                     .get("parts", [{}])[0]
-                    .get("text", "No response from Gemini baby 💋")
+                    .get("text", "No reply from Gemini baby 💋")
             )
 
         except Exception as e:
             return f"Gemini error: {str(e)}"
 
 
-# --------------------------------
-#  TELEGRAM SENDER
-# --------------------------------
+# ---------------------------------
+# SEND MESSAGE TO TELEGRAM
+# ---------------------------------
 async def send_message(chat_id: int, text: str):
     url = f"{TG_API_URL}/sendMessage"
     payload = {"chat_id": chat_id, "text": text}
@@ -66,10 +61,10 @@ async def send_message(chat_id: int, text: str):
         await client.post(url, json=payload)
 
 
-# --------------------------------
-#  WEBHOOK HANDLER
-# --------------------------------
-@app.post("/")
+# ---------------------------------
+# TELEGRAM WEBHOOK
+# ---------------------------------
+@app.post("/webhook")
 async def webhook(request: Request):
     data = await request.json()
 
@@ -79,15 +74,23 @@ async def webhook(request: Request):
     chat_id = data["message"]["chat"]["id"]
     user_text = data["message"].get("text", "")
 
-    # Ask Gemini
-    reply = await ask_gemini(user_text)
+    text = user_text.lower().strip()
 
-    # Send reply
+    # Custom greeting replies
+    greetings = ["hi", "hello", "hey", "hii", "hiii", "hai", "vanakkam", "/start"]
+    
+    if text in greetings:
+        reply = "Hi there, Future CA of Munnetram 🙌✨\nHow can I help you today?"
+        await send_message(chat_id, reply)
+        return JSONResponse({"ok": True})
+
+    # Ask Gemini for everything else
+    reply = await ask_gemini(user_text)
     await send_message(chat_id, reply)
 
     return JSONResponse({"ok": True})
-
-
+# HOME ROUTE
+# ---------------------------------
 @app.get("/")
 async def home():
     return {"status": "Bot is running with Gemini 💙"}
