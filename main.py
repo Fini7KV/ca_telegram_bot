@@ -14,6 +14,20 @@ TELEGRAM_API = f"https://api.telegram.org/bot{BOT_TOKEN}"
 
 
 # ------------------------------
+#   SEND MESSAGE TO TELEGRAM
+# ------------------------------
+async def send_message(chat_id: int, text: str):
+    url = f"{TELEGRAM_API}/sendMessage"
+    payload = {
+        "chat_id": chat_id,
+        "text": text
+    }
+
+    async with httpx.AsyncClient() as client:
+        await client.post(url, json=payload)
+
+
+# ------------------------------
 #   Gemini – professional helper
 # ------------------------------
 async def ask_gemini(question: str) -> str:
@@ -46,13 +60,16 @@ async def ask_gemini(question: str) -> str:
 
 
 # ------------------------------
-#     Webhook setup
+#     Home Route
 # ------------------------------
 @app.get("/")
 def home():
     return {"status": "Bot is running professionally with Gemini 💙"}
 
 
+# ------------------------------
+#     Telegram Webhook
+# ------------------------------
 @app.post("/webhook")
 async def telegram_webhook(request: Request):
     update = await request.json()
@@ -69,24 +86,24 @@ async def telegram_webhook(request: Request):
     if text.lower() in ["/start", "hi", "hello", "hey"]:
         await send_message(
             chat_id,
-            "Hello, Future CA!\n\n"
-            "I’m your Study Assistant. How can I help you today?\n"
+            "Hello, Future CA! 🙌✨\n\n"
+            "I’m your Study Assistant. How can I help you today?\n\n"
             "You can ask questions from:\n"
-            "- Business Law\n"
-            "- Mathematics, Statistics\n"
-            "- Economics\n"
-            "- Accounting (Basic theory)"
+            "- 📘 Business Law\n"
+            "- 📊 Mathematics & Statistics\n"
+            "- 📚 Economics\n"
+            "- 🧾 Accounting (Basic theory)"
         )
         return {"ok": True}
 
-    # Ask Gemini for any question
+    # Gemini answer
     reply = await ask_gemini(text)
     await send_message(chat_id, reply)
     return {"ok": True}
 
 
 # ------------------------------
-#     Set webhook (manual)
+#     Set webhook manually
 # ------------------------------
 @app.get("/setwebhook")
 async def set_webhook():
