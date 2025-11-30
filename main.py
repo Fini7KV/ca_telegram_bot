@@ -25,6 +25,33 @@ async def send_message(chat_id: int, text: str):
 # ---------------------------------------------------
 # OpenRouter AI Answer Function
 # ---------------------------------------------------
+import os
+import httpx
+from fastapi import FastAPI, Request
+
+BOT_TOKEN = os.getenv("BOT_TOKEN")
+OPENROUTER_KEY = os.getenv("OPENROUTER_KEY")
+PUBLIC_URL = os.getenv("PUBLIC_URL")
+
+app = FastAPI()
+
+TELEGRAM_API = f"https://api.telegram.org/bot{BOT_TOKEN}"
+
+
+# ---------------------------------------------------
+# Send Telegram message
+# ---------------------------------------------------
+async def send_message(chat_id: int, text: str):
+    async with httpx.AsyncClient() as client:
+        await client.post(
+            f"{TELEGRAM_API}/sendMessage",
+            json={"chat_id": chat_id, "text": text}
+        )
+
+
+# ---------------------------------------------------
+# OpenRouter AI Answer Function
+# ---------------------------------------------------
 async def ask_openrouter(question: str) -> str:
     url = "https://openrouter.ai/api/v1/chat/completions"
 
@@ -53,6 +80,14 @@ async def ask_openrouter(question: str) -> str:
     except Exception as e:
         print("OpenRouter Error:", e)
         return "Sorry Aspirant, I couldn't fetch an answer right now 😞"
+
+
+# ---------------------------------------------------
+# Telegram Webhook
+# ---------------------------------------------------
+@app.post("/webhook")
+async def telegram_webhook(request: Request):
+    update = await request.json()
 
 
 # ---------------------------------------------------
