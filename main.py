@@ -33,9 +33,8 @@ async def ask_openrouter(question: str) -> str:
     }
 
     payload = {
-        "model": "gryphe/mythomax-l2",   # FREE MODEL ❤️
+        "model": "gryphe/mythomax-l2:free",
         "messages": [
-            {"role": "system", "content": "You are a CA Study Assistant. Give clear, simple answers."},
             {"role": "user", "content": question}
         ]
     }
@@ -43,18 +42,14 @@ async def ask_openrouter(question: str) -> str:
     try:
         async with httpx.AsyncClient(timeout=20) as client:
             res = await client.post(url, json=payload, headers=headers)
-
             print("OpenRouter Raw:", res.text)
 
             data = res.json()
-
             return data["choices"][0]["message"]["content"]
 
     except Exception as e:
         print("OpenRouter Error:", e)
-        return "Sorry baby, something went wrong 😞"
-
-
+        return "Sorry Aspirant, I couldn't fetch an answer right now 😞"
 # ---------------------------------------------------
 # Telegram Webhook
 # ---------------------------------------------------
