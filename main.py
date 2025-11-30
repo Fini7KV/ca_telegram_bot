@@ -26,31 +26,31 @@ async def send_message(chat_id: int, text: str):
 #  GEMINI ANSWER FUNCTION (working model)
 # ---------------------------------------------------
 async def ask_gemini(question: str) -> str:
-    url = (
-        "https://generativelanguage.googleapis.com/v1beta/"
-        f"models/gemini-1.5-flash:generateContent?key={GEMINI_KEY}"
-    )
+    url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key={GEMINI_KEY}"
 
     payload = {
         "contents": [
-            {"parts": [{"text": question}]}
+            {
+                "parts": [
+                    {"text": question}
+                ]
+            }
         ]
     }
 
+    headers = {"Content-Type": "application/json"}
+
     try:
-        async with httpx.AsyncClient(timeout=20) as client:
-            response = await client.post(url, json=payload)
+        async with httpx.AsyncClient() as client:
+            response = await client.post(url, json=payload, headers=headers, timeout=20)
+            print("Gemini Raw Response:", response.text)
             data = response.json()
 
-            print("Gemini Raw Response:", data)
-
-            # Extract response
             return data["candidates"][0]["content"]["parts"][0]["text"]
 
     except Exception as e:
         print("Gemini Error:", e)
-        return "Sorry — unable to fetch an answer at the moment."
-
+        return "Sorry — unable to fetch an answer right now."
 
 # ---------------------------------------------------
 #  HOME PAGE
