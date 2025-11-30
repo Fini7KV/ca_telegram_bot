@@ -48,13 +48,11 @@ async def ask_openrouter(question: str) -> str:
 
             data = res.json()
 
-            # OPENROUTER PARSING
             return data["choices"][0]["message"]["content"]
 
     except Exception as e:
         print("OpenRouter Error:", e)
         return "Sorry Aspirant, I couldn't fetch an answer right now 😞"
-
 
 
 # ---------------------------------------------------
@@ -85,9 +83,10 @@ async def telegram_webhook(request: Request):
         )
         return {"ok": True}
 
-    answer = await ask_ai(text)
-    await send_message(chat_id, answer)
+    # FIXED LINE HERE ❤️
+    answer = await ask_openrouter(text)
 
+    await send_message(chat_id, answer)
     return {"ok": True}
 
 
