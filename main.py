@@ -53,25 +53,22 @@ def set_telegram_webhook():
         return False
 
 def ask_groq(question: str) -> str:
-    """
-    Ask Groq using a supported model.
-    """
     if groq_client:
         try:
             resp = groq_client.chat.completions.create(
-                model="llama3-70b-8192",   # UPDATED MODEL
+                model="llama3-70b-versatile",
                 messages=[
-                    {"role": "system", "content": "You are Nexus, an exam-focused CA Foundation tutor."},
+                    {"role": "system", "content": "You are Nexus, an exam-focused CA Foundation tutor. Keep answers simple, clear, and exam-oriented."},
                     {"role": "user", "content": question}
                 ],
-                max_tokens=2000,
+                max_tokens=3000,
             )
             return resp.choices[0].message["content"].strip()
         except Exception as e:
             print("Groq error:", e)
             return "Sorry Aspirant, Groq had an issue. Try again."
     else:
-        return "Groq not configured. Set GROQ_API_KEY in environment."
+        return "Groq not configured. Set GROQ_API_KEY."
         # fallback / testing reply
         return "Groq not configured. Set GROQ_API_KEY in environment to enable AI replies."
 
