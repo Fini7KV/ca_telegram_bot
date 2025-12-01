@@ -1,69 +1,129 @@
+# main.py
 import os
-import asyncio
-from telegram import Update
-from telegram.ext import (
-    Application,
-    CommandHandler,
-    MessageHandler,
-    ContextTypes,
-    filters
-)
-from groq import Groq
+import time
+import requests
+from flask import Flask, request, jsonify
 from dotenv import load_dotenv
+
+# optional: import and use the groq client if you prefer
+try:
+    from groq import Groq
+    HAS_GROQ = True
+except Exception:
+    HAS_GROQ = False
 
 load_dotenv()
 
 BOT_TOKEN = os.getenv("BOT_TOKEN")
-GROQ_API_KEY = os.getenv("GROQ_API_KEY")
+if not BOT_TOKEN:
+    raise SystemExit("BOT_TOKEN not set in environment")
 
-client = Groq(api_key=GROQ_API_KEY)
-
-APP_URL = os.getenv("RENDER_EXTERNAL_URL")
+# Render provides a public URL in RENDER_EXTERNAL_URL (or set your own)
+APP_URL = os.getenv("RENDER_EXTERNAL_URL") or os.getenv("APP_URL")
+if not APP_URL:
+    print("Warning: RENDER_EXTERNAL_URL / APP_URL not set. Webhook setup will fail until deployed.")
 WEBHOOK_PATH = f"/webhook/{BOT_TOKEN}"
-WEBHOOK_URL = APP_URL + WEBHOOK_PATH
-PORT = int(os.environ.get("PORT", 10000))
+WEBHOOK_URL = (APP_URL + WEBHOOK_PATH) if APP_URL else None
 
+PORT = int(os.getenv("PORT", 10000))
 
-async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    await update.message.reply_text("Hello! I am Nexus 🤖💙 Your CA Foundation AI tutor.")
+GROQ_API_KEY = os.getenv("GROQ_API_KEY")
+if GROQ_API_KEY and HAS_GROQ:
+    groq_client = Groq(api_key=GROQ_API_KEY)
+else:
+    groq_client = None
 
+app = Flask(__name__)
 
-async def ai_reply(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    user_msg = update.message.text
+def set_telegram_webhook():
+    if not WEBHOOK_URL:
+        print("No WEBHOOK_URL (APP_URL missing). Skipping setWebhook.")
+        return False
 
-    completion = client.chat.completions.create(
-        model="llama3-8b-8192",
-        messages=[
-            {"role": "system", "content": "You are Nexus, a CA tutor."},
-            {"role": "user", "content": user_msg},
-        ],
-    )
+    url = f"https://api.telegram.org/bot{BOT_TOKEN}/setWebhook"
+    payload = {"url": WEBHOOK_URL}
+    try:
+        r = requests.post(url, json=payload, timeout=15)
+        r.raise_for_status()
+        j = r.json()
+        print("setWebhook response:", j)
+        return j.get("ok", False)
+    except Exception as e:
+        print("Failed to set webhook:", e)
+        return False
 
-    reply = completion.choices[0].message["content"]
-    await update.message.reply_text(reply)
+def ask_groq(question: str) -> str:
+    """
+    If you have the Groq client installed and API key set, use it.
+    Otherwise return a simple canned reply (so testing still works).
+    """
+    if groq_client:
+        resp = groq_client.chat.completions.create(
+            model="llama3-8b-8192",
+            messages=[
+                {"role": "system", "content": "You are Nexus, an exam-focused CA Foundation tutor."},
+                {"role": "user", "content": question}
+            ],
+            max_tokens=8000,
+        )
+        try:
+            return resp.choices[0].message["content"].strip()
+        except Exception:
+            return "Sorry, Groq returned an unexpected response."
+    else:
+        # fallback / testing reply
+        return "Groq not configured. Set GROQ_API_KEY in environment to enable AI replies."
 
+@app.route("/", methods=["GET"])
+def home():
+    return "Nexus (Telegram webhook) is alive", 200
 
-async def main():
-    app = Application.builder().token(BOT_TOKEN).build()
+@app.route(WEBHOOK_PATH, methods=["POST"])
+def webhook():
+    data = request.get_json(force=True, silent=True)
+    if not data:
+        return jsonify({"status": "no json"}), 400
 
-    app.add_handler(CommandHandler("start", start))
-    app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, ai_reply))
+    # Only handle messages; ignore other update types for now
+    msg = data.get("message") or data.get("edited_message")
+    if not msg:
+        return "", 200
 
-    await app.initialize()
-    await app.bot.set_webhook(WEBHOOK_URL)
+    chat = msg.get("chat", {})
+    chat_id = chat.get("id")
+    text = msg.get("text", "").strip() if msg.get("text") else ""
 
-    # This is the CORRECT method for PTB 20.7
-    await app.start()
-    await app.updater.start_webhook(
-        listen="0.0.0.0",
-        port=PORT,
-        url_path=WEBHOOK_PATH,
-        webhook_url=WEBHOOK_URL,
-    )
+    if not chat_id or not text:
+        return "", 200
 
-    print("🚀 Nexus webhook running on Render!")
-    await app.updater.idle()
+    # quick command handler
+    if text.startswith("/start"):
+        reply_text = "Hello! I am Nexus 🤖💙 Your CA Foundation AI tutor.\nAsk me anything: Law, Accounts, Maths & Stats, Economics."
+    else:
+        # call Groq or fallback
+        reply_text = ask_groq(text)
 
+    send_url = f"https://api.telegram.org/bot{BOT_TOKEN}/sendMessage"
+    payload = {"chat_id": chat_id, "text": reply_text}
+    try:
+        r = requests.post(send_url, json=payload, timeout=15)
+        # don't raise to avoid failing webhook; just log
+        print("sendMessage status:", r.status_code, r.text[:500])
+    except Exception as e:
+        print("Failed to sendMessage:", e)
+
+    return "", 200
 
 if __name__ == "__main__":
-    asyncio.run(main())
+    # Give Render a second to set envs reliably
+    time.sleep(0.5)
+
+    # Try set webhook if we have APP_URL
+    if WEBHOOK_URL:
+        ok = set_telegram_webhook()
+        if not ok:
+            print("Warning: setWebhook returned false. Check APP_URL and BOT_TOKEN.")
+
+    # Start Flask (Render will run this)
+    print(f"Starting Flask on 0.0.0.0:{PORT}, webhook path {WEBHOOK_PATH}")
+    app.run(host="0.0.0.0", port=PORT)
