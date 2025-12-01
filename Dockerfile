@@ -1,23 +1,15 @@
-# Dockerfile — fixed Python 3.11 environment 
+# Use official Python image
 FROM python:3.11-slim
 
+# Set working directory
 WORKDIR /app
 
-# copy requirements first
+# Copy requirements and install
 COPY requirements.txt /app/
-
-# install dependencies
 RUN pip install --no-cache-dir -r requirements.txt
 
-# copy rest of the project
+# Copy project files
 COPY . /app
 
-# create a non-root user
-RUN useradd -m appuser || true
-USER appuser
-
-# expose port
-EXPOSE 10000
-
-# start command (Render will pass $PORT)
-CMD ["sh", "-c", "uvicorn main:app --host 0.0.0.0 --port ${PORT:-10000}"]
+# Run the Telegram bot
+CMD ["python", "main.py"]
