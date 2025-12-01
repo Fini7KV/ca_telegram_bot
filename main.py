@@ -10,13 +10,13 @@ client = Groq(api_key=GROQ_API_KEY)
 
 SYSTEM_PROMPT = """
 You are NEXUS 🤖💙, a CA Foundation AI tutor.
-Always answer with perfect exam-ready clarity.
+Always answer with exam-perfect clarity.
 Subjects: Law, Accounts, Maths & Stats, Economics.
 """
 
 async def ask_groq(prompt: str) -> str:
     response = client.chat.completions.create(
-        model="llama3-8b-8192",   # ✔ CORRECT WORKING MODEL
+        model="llama3-8b-8192",  # ✔ Works perfectly on Groq
         messages=[
             {"role": "system", "content": SYSTEM_PROMPT},
             {"role": "user", "content": prompt}
@@ -29,16 +29,15 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     text = update.message.text
     await update.message.chat.send_action("typing")
 
-    reply = await ask_groq(text)
+    answer = await ask_groq(text)
+    await update.message.reply_text(f"{answer}\n\n— Nexus")
 
-    await update.message.reply_text(f"{reply}\n\n— Nexus")
-
-async def main():
+def main():
     app = ApplicationBuilder().token(TELEGRAM_TOKEN).build()
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
+
     print("Nexus is running…")
-    await app.run_polling()
+    app.run_polling()  # ✔ No async wrapper, no event loop crash
 
 if __name__ == "__main__":
-    import asyncio
-    asyncio.run(main())
+    main()
